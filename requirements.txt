@@ -1,0 +1,15 @@
+requests
+urllib3
+tqdm
+pandas
+numpy
+sqlalchemy
+pymysql
+scipy
+statsmodels
+matplotlib
+seaborn
+plotly
+streamlit
+ipykernel
+notebook

@@ -1,0 +1,14 @@
+# .gitignore
+
+# 설정 파일 및 비밀 정보 제외
+config/api.txt
+config/db.txt
+
+# 파이썬 캐시 파일 제외
+__pycache__/
+*.pyc
+
+# 가상환경 폴더 제외
+venv/
+env/
+.env
