@@ -102,30 +102,177 @@ def get_loa_daily_avg_df(df):
 # -----------------------------------------------------------------------------
 # 4. 차트 그리기
 # -----------------------------------------------------------------------------
+def analyze_market_status(df, column_name):
+    """RSI 및 볼린저 밴드 기반 종합 분석"""
+    subset = df[column_name].dropna()
+    if len(subset) < 24:
+        return None
+
+    # 1. RSI (상대강도지수) 계산 (14일 기준)
+    delta = subset.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    current_rsi = rsi.iloc[-1]  # 현재 RSI 값
+
+    # 2. 볼린저 밴드 및 가격 위치
+    window = 24
+    ma = subset.rolling(window=window).mean().iloc[-1]
+    std = subset.rolling(window=window).std().iloc[-1]
+    upper = ma + (2 * std)
+    lower = ma - (2 * std)
+    current_price = subset.iloc[-1]
+    prev_price = subset.iloc[-2]
+
+    # 3. 종합 판단 로직
+    # 가격 변동
+    diff = current_price - prev_price
+    diff_msg = f"{diff:+,.0f}" if diff != 0 else "0"
+
+    # 신호 및 색상 결정
+    signal_msg = "관망 (적정가)"
+    color = "gray"
+    bg_color = "#f9f9f9"  # 기본 배경
+
+    # (A) 강력 매수/매도 신호 (BB + RSI 동시 충족 시)
+    if current_price <= lower and current_rsi <= 30:
+        signal_msg = "🔥 강력 매수 (저점+과매도)"
+        color = "#d9534f"
+        bg_color = "#ffe6e6"
+    elif current_price >= upper and current_rsi >= 70:
+        signal_msg = "🚨 강력 매도 (고점+과열)"
+        color = "#0275d8"
+        bg_color = "#e6f2ff"
+
+    # (B) 일반 신호
+    elif current_price <= lower:
+        signal_msg = "🟢 매수 기회 (밴드 하단)"
+        color = "green"
+        bg_color = "#eaffea"
+    elif current_price >= upper:
+        signal_msg = "🔴 매수 주의 (밴드 상단)"
+        color = "red"
+        bg_color = "#ffebe6"
+    elif current_rsi >= 70:
+        signal_msg = "📈 과열 양상 (RSI 높음)"
+        color = "orange"
+    elif current_rsi <= 30:
+        signal_msg = "📉 침체 양상 (RSI 낮음)"
+        color = "blue"
+
+    return {
+        "price": f"{current_price:,.0f}",
+        "diff": diff_msg,
+        "rsi": f"{current_rsi:.1f}",
+        "signal": signal_msg,
+        "color": color,
+        "bg_color": bg_color
+    }
+
+
 def draw_stock_chart(df, title_text=""):
     if df.empty:
         st.warning("표시할 데이터가 없습니다.")
         return
 
-    # (A) 실시간 시세 차트 구성
+    plot_df = df.copy()
+
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        # 체크박스 키(key)를 유니크하게 설정
+        show_bollinger = st.checkbox("볼린저 밴드", value=False, key=f"bollinger_{title_text}")
+
+    st.markdown("##### 시장 분석 리포트")
+
+    cols = st.columns(len(plot_df.columns))
+    for idx, column in enumerate(plot_df.columns):
+        analysis = analyze_market_status(plot_df, column)
+        with cols[idx]:
+            if analysis is None:
+                st.caption(f"**{column}**: 데이터 부족")
+                continue
+
+            rsi_val = float(analysis['rsi'])
+            rsi_bar_color = "red" if rsi_val >= 70 else "blue" if rsi_val <= 30 else "gray"
+
+            st.markdown(f"""
+            <div style="
+                border: 1px solid #ddd; 
+                border-radius: 10px; 
+                padding: 15px; 
+                background-color: {analysis['bg_color']};
+                box-shadow: 2px 2px 5px rgba(0,0,0,0.05);">
+                <div style="font-size: 0.9rem; color: #555; margin-bottom: 5px;">{column}</div>
+                <div style="display: flex; justify-content: space-between; align-items: end;">
+                    <span style="font-size: 1.4rem; font-weight: bold; color: #333;">{analysis['price']} G</span>
+                    <span style="font-size: 0.9rem; font-weight: bold; color: {analysis['color']};">
+                        ({analysis['diff']})
+                    </span>
+                </div>
+                <hr style="margin: 10px 0; border: 0; border-top: 1px solid #ddd;">
+                <div style="font-size: 0.85rem; color: #666; margin-bottom: 5px;">
+                    RSI 지수: <span style="font-weight:bold; color:{rsi_bar_color}">{analysis['rsi']}</span>
+                </div>
+                <div style="font-size: 1rem; font-weight: bold; color: {analysis['color']};">
+                    {analysis['signal']}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
     fig = go.Figure()
 
-    for column in df.columns:
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22',
+              '#17becf']
+
+    for idx, column in enumerate(plot_df.columns):
+        line_color = colors[idx % len(colors)]
+
         fig.add_trace(go.Scatter(
-            x=df.index, y=df[column],
+            x=plot_df.index, y=plot_df[column],
             mode='lines', name=column,
-            line=dict(width=2),
+            line=dict(width=2, color=line_color),
             hovertemplate='%{x|%m/%d %H:%M} - %{y:,.0f} 골드<extra></extra>'
         ))
+
+        if show_bollinger:
+            ma = plot_df[column].rolling(window=24).mean()
+            std = plot_df[column].rolling(window=24).std()
+            upper = ma + (std * 2)
+            lower = ma - (std * 2)
+
+            fill_color_rgba = f"rgba{tuple(list(int(line_color.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4)) + [0.1])}"
+
+            fig.add_trace(go.Scatter(
+                x=plot_df.index, y=upper, mode='lines',
+                line=dict(width=0), showlegend=False, hoverinfo='skip'
+            ))
+
+            fig.add_trace(go.Scatter(
+                x=plot_df.index, y=lower,
+                mode='lines',
+                name=f"{column} 볼린저 영역",
+                line=dict(width=0),
+                fill='tonexty',
+                fillcolor=fill_color_rgba,
+                showlegend=True,
+                hoverinfo='skip'
+            ))
+
+            fig.add_trace(go.Scatter(
+                x=plot_df.index, y=ma, mode='lines',
+                line=dict(width=1, dash='dot', color=line_color),
+                hoverinfo='skip', showlegend=False
+            ))
 
     min_date = df.index.min()
     max_date = df.index.max()
 
     if not pd.isnull(min_date) and not pd.isnull(max_date):
-        # 점검 시간 영역 표시 (수요일 06:00 ~ 10:00)
         current_ptr = min_date.replace(hour=0, minute=0, second=0)
         while current_ptr <= max_date:
-            if current_ptr.weekday() == 2:  # 수요일
+            if current_ptr.weekday() == 2:
                 patch_start = current_ptr.replace(hour=6, minute=0)
                 patch_end = current_ptr.replace(hour=10, minute=0)
                 if min_date <= patch_end and patch_start <= max_date:
@@ -138,7 +285,6 @@ def draw_stock_chart(df, title_text=""):
                     )
             current_ptr += timedelta(days=1)
 
-        # 이벤트 종료일 표시
         event_logs = load_event_logs()
         for name, date_str in event_logs.items():
             try:
@@ -176,8 +322,7 @@ def draw_stock_chart(df, title_text=""):
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # (B) 로아 기준 일평균 시계열 차트
-    st.markdown(f"#### 일평균 가격")
+    st.markdown(f"#### 일평균 가격 (06시 기준)")
     daily_df = get_loa_daily_avg_df(df)
 
     if not daily_df.empty:
@@ -190,7 +335,6 @@ def draw_stock_chart(df, title_text=""):
                 hovertemplate='%{x|%m/%d} 평균: %{y:,.0f} 골드<extra></extra>'
             ))
 
-        kor_days = ['월', '화', '수', '목', '금', '토', '일']
         d_tick_vals = daily_df.index
         d_tick_text = [d.strftime(f'%m/%d ({kor_days[d.weekday()]})') for d in d_tick_vals]
 
@@ -198,12 +342,8 @@ def draw_stock_chart(df, title_text=""):
             hovermode="x unified",
             template="plotly_white",
             xaxis=dict(
-                showgrid=True,
-                gridcolor='#eee',
-                type="date",
-                tickmode='array',
-                tickvals=d_tick_vals,
-                ticktext=d_tick_text,
+                showgrid=True, gridcolor='#eee', type="date",
+                tickmode='array', tickvals=d_tick_vals, ticktext=d_tick_text,
                 dtick=86400000
             ),
             yaxis=dict(showgrid=True, gridcolor='#eee', tickformat=',', title="평균가 (골드)"),
@@ -212,11 +352,42 @@ def draw_stock_chart(df, title_text=""):
         )
         st.plotly_chart(fig_daily, use_container_width=True)
 
-        with st.expander("데이터 요약 표 보기"):
-            display_df = daily_df.copy()
-            display_df.index = [d.strftime(f'%Y-%m-%d ({kor_days[d.weekday()]})') for d in display_df.index]
+        st.markdown("##### 데이터 요약 표")
 
-            st.dataframe(display_df.sort_index(ascending=False).style.format("{:,.1f}"))
+        daily_sorted = daily_df.sort_index(ascending=True)
+        daily_diff = daily_sorted.diff()
+
+        daily_desc = daily_sorted.sort_index(ascending=False)
+        diff_desc = daily_diff.sort_index(ascending=False)
+
+        display_df = pd.DataFrame(index=daily_desc.index, columns=daily_desc.columns)
+
+        for col in daily_desc.columns:
+            display_df[col] = [
+                f"{price:,.0f} ({diff:+,.0f})" if not pd.isna(diff) else f"{price:,.0f} (-)"
+                for price, diff in zip(daily_desc[col], diff_desc[col])
+            ]
+
+        display_df.index = [d.strftime(f'%Y-%m-%d ({kor_days[d.weekday()]})') for d in display_df.index]
+
+        def style_variance(val):
+            try:
+                if "(-)" in val: return "color: gray;"
+                start = val.rfind('(') + 1
+                end = val.rfind(')')
+                change_str = val[start:end].replace(',', '')
+                change = float(change_str)
+
+                if change > 0:
+                    return 'color: #d9534f; font-weight: bold;'
+                elif change < 0:
+                    return 'color: #0275d8; font-weight: bold;'
+                else:
+                    return 'color: gray;'
+            except:
+                return ""
+
+        st.dataframe(display_df.style.map(style_variance))
 
 
 # -----------------------------------------------------------------------------
