@@ -424,7 +424,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["강화 재료", "생활 재료", "배�
 with tab1:
     st.subheader("강화 재료 시세")
     if df_materials is not None:
-        all_items = df_materials['item_name'].unique()
+        all_items = sorted(df_materials['item_name'].unique())
         default_items = ["운명의 파괴석", "운명의 파괴석 결정"]
         valid_defaults = [i for i in default_items if i in all_items]
         selected = st.multiselect("확인할 재료를 선택하세요", all_items, default=valid_defaults)
@@ -465,23 +465,23 @@ with tab2:
     st.subheader("생활 재료 시세")
     if df_lifeskill is not None:
         cat = st.selectbox("카테고리", df_lifeskill['sub_category'].unique())
-        items = df_lifeskill[df_lifeskill['sub_category'] == cat]['item_name'].unique()
-        sel_life = st.multiselect("재료 선택", items, default=items[:5])
+        items = sorted(df_lifeskill[df_lifeskill['sub_category'] == cat]['item_name'].unique())
+        sel_life = st.multiselect("재료 선택", items, default=items[:1])
         c_data = preprocess_for_chart(df_lifeskill, sel_life)
         if not c_data.empty: draw_stock_chart(c_data, f"생활 재료 ({cat})")
 
 with tab3:
     st.subheader("배틀 아이템 시세")
     if df_battle is not None:
-        items = df_battle['item_name'].unique()
-        sel_battle = st.multiselect("아이템 선택", items, default=items[:5])
+        items = sorted(df_battle['item_name'].unique())
+        sel_battle = st.multiselect("아이템 선택", items, default=items[:1])
         c_data = preprocess_for_chart(df_battle, sel_battle)
         if not c_data.empty: draw_stock_chart(c_data, "배틀 아이템")
 
 with tab4:
     st.subheader("유물 각인서 시세")
     if df_engravings is not None:
-        items = df_engravings['item_name'].unique()
+        items = sorted(df_engravings['item_name'].unique())
         sel_eng = st.multiselect("각인서 선택", items, default=items[:1])
         c_data = preprocess_for_chart(df_engravings, sel_eng)
         if not c_data.empty: draw_stock_chart(c_data, "유물 각인서")
@@ -489,7 +489,7 @@ with tab4:
 with tab5:
     st.subheader("T4 보석 최저가")
     if df_gems is not None:
-        items = df_gems['item_name'].unique()
-        sel_gems = st.multiselect("보석 선택", items, default=items)
+        items = sorted(df_gems['item_name'].unique())
+        sel_gems = st.multiselect("보석 선택", items, default=items[:2])
         c_data = preprocess_for_chart(df_gems, sel_gems)
         if not c_data.empty: draw_stock_chart(c_data, "T4 보석")
