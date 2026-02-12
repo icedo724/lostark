@@ -16,31 +16,41 @@ class LostArkAPI:
     def get_market_items(self, category_code, item_name=None, item_tier=None, item_grade=None, page_no=1,
                          sort_condition="ASC"):
         url = f"{self.base_url}/markets/items"
-
         payload = {
             "Sort": "CURRENT_MIN_PRICE",
             "CategoryCode": category_code,
             "PageNo": page_no,
             "SortCondition": sort_condition
         }
+        if item_tier: payload["ItemTier"] = item_tier
+        if item_name: payload["ItemName"] = item_name
+        if item_grade: payload["ItemGrade"] = item_grade
 
-        # 선택적 파라미터 추가
-        if item_tier:
-            payload["ItemTier"] = item_tier
-        if item_name:
-            payload["ItemName"] = item_name
-        if item_grade:
-            payload["ItemGrade"] = item_grade
+        return self._send_request(url, payload)
 
+    def get_auction_items(self, category_code, item_name, item_tier=None, page_no=1):
+        url = f"{self.base_url}/auctions/items"
+        payload = {
+            "ItemLevelMin": 0, "ItemLevelMax": 0,
+            "ItemTier": item_tier if item_tier else 0,
+            "CategoryCode": category_code,
+            "ItemName": item_name,
+            "PageNo": page_no,
+            "Sort": "BUY_PRICE",
+            "SortCondition": "ASC"
+        }
+
+        return self._send_request(url, payload)
+
+    def _send_request(self, url, payload):
         try:
             response = requests.post(url, headers=self.headers, json=payload)
-
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 429:
-                print("⏳ Rate Limit 도달. 60초 대기 중...")
+                print("Rate Limit 도달. 60초 대기")
                 time.sleep(60)
-                return self.get_market_items(category_code, item_name, item_tier, item_grade, page_no, sort_condition)
+                return self._send_request(url, payload)
             else:
                 print(f"API 오류 ({response.status_code}): {response.text}")
                 return None

@@ -13,3 +13,5 @@ plotly
 streamlit
 ipykernel
 notebook
+streamlit
+plotly
