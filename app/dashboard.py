@@ -112,7 +112,7 @@ with tab1:
                 st.caption("비교하고 싶은 **하위 재료**와 **상위 재료**를 위 목록에서 **함께 선택**해주세요.")
             else:
                 for low, high in active_pairs:
-                    st.markdown(f"##### [{high}] 제작 효율 분석")
+                    st.markdown(f"##### [{high}] 가격 비교")
 
                     df_pair = chart_data[[low, high]].copy()
                     df_pair[f"{low} (x5)"] = df_pair[low] * 5
