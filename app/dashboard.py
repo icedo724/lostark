@@ -186,11 +186,11 @@ with tab1:
                     diff_unit = last_high_unit_cost - last_low_total_cost
 
                     if diff_unit > 0:
-                        st.success(f"결론: **{high} 1묶음(100개)** 을 교환으로 얻으면, 그냥 사는 것보다 **약 {diff_unit:,.0f} 골드** 이득입니다!")
+                        st.success(f"**{low}** → **{high}** : 묶음 당 약 **{diff_unit:,.0f} 골드** 이득")
                     elif diff_unit < 0:
-                        st.error(f"결론: **{high} 1묶음(100개)** 을 그냥 경매장에서 사는 게 교환보다 **약 {abs(diff_unit):,.0f} 골드** 이득입니다!")
+                        st.error(f"**{low}** → **{high}** : 묶음 당 약 **{abs(diff_unit):,.0f} 골드** 손해")
                     else:
-                        st.info("가격이 동일합니다.")
+                        st.info("교환 비용과 구매 비용이 동일합니다.")
     else:
         st.warning("아직 데이터가 수집되지 않았습니다.")
 
